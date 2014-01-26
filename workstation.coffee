@@ -1,31 +1,36 @@
+"use strict"
+
 fs = require('fs')
 sh = require('execSync')
 io = require('socket.io-client')
 request = require('request')
 
-serverUrl = 'http://localhost:8000'
+serverUrl = process.env.WS_URL or 'http://localhost:8000'
+socket = io.connect(process.env.REGSERVER_URL or 'http://localhost:3100/ws-proxy')
 
-socket = io.connect('http://localhost:3100/ws-proxy')
 iostream = require('socket.io-stream')
 ss = iostream(socket)
 ss.on 'http', (body, options) ->
   headers = {}
   headers[key] = value for key, value of options.headers when key in ['content-type', 'accept']
-  opt =
-    url: "#{serverUrl}#{options.path}"
-    method: options.method or 'GET'
-    qs: options.query or ''
-    headers: headers
-    body: body
-  console.log JSON.stringify opt
-  req = request(opt)
-  stream = iostream.createStream()
-  req.pipe stream
-  req.on 'response', (response) ->
-    ss.emit 'response', stream,
-      statusCode: response.statusCode
-      headers: response.headers
-      id: options.id
+  rawData = ''
+  body.on 'data', (chunk) ->
+    rawData += chunk
+  body.on 'end', ->
+    opt =
+      url: "#{serverUrl}#{options.path}"
+      method: options.method or 'GET'
+      qs: options.query or ''
+      headers: headers
+      body: rawData
+    req = request(opt)
+    stream = iostream.createStream()
+    req.pipe stream
+    req.on 'response', (response) ->
+      ss.emit 'response', stream,
+        statusCode: response.statusCode
+        headers: response.headers
+        id: options.id
 
 socket.on 'connect', ->
   callback = (options) ->
@@ -34,7 +39,7 @@ socket.on 'connect', ->
         register callback
       , 10000
     else
-      timeoutId = setInterval update, 2000
+      timeoutId = setInterval update, 5000
       socket.on 'disconnect', -> clearTimeout timeoutId
   register callback
 

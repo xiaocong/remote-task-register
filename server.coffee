@@ -16,7 +16,6 @@ app.set 'endpoint', process.env.ENDPOINT or '/ws-proxy'
 app.set 'zk_root', process.env.ZK_ROOT or '/remote/alive/workstation'
 app.set 'zk_url', process.env.ZK_URL or "localhost:2181"
 app.enable 'trust proxy'
-app.use express.bodyParser()
 app.use express.methodOverride()
 
 if "development" is app.get("env")
@@ -28,16 +27,17 @@ app.all "#{app.get 'endpoint'}/:mac/*", (req, res) ->
   return res.send(404) if req.params.mac not of wss
   # workaround here, I want to use
   # req.pipe(stream) and then use stream in request
-  body = if req.body is {} then '' else JSON.stringify(req.body)
+  stream = iostream.createStream()
   wss[req.params.mac].request
     path: "/api/#{req.params[0]}"
     method: req.method
     headers: req.headers
     query: req.query
-  , body, (stream, options) ->
+  , stream, (stream, options) ->
     res.statusCode = options.statusCode
     res.set(options.headers)
     stream.pipe res
+  req.pipe stream
 
 ip = do ->
   ifaces = os.networkInterfaces()
@@ -67,6 +67,8 @@ zk.once 'connected', ->
       "#{app.get('zk_root')}/#{mac}"
 
     io = require('socket.io').listen(server)
+    if "development" isnt app.get('env')
+      io.set('log level', 1)
     io.of(app.get('endpoint')).on 'connection', (socket) ->
       ss = iostream(socket)
       request = http(ss)
@@ -90,7 +92,6 @@ zk.once 'connected', ->
           fn(returncode: 0) if fn
 
           info.on 'change', (event) ->
-            console.log "Update zk node: #{JSON.stringify(info.toJSON())}"
             zk.setData path, new Buffer(JSON.stringify info.toJSON()), (err, stat) ->
               return console.log(err) if err
 
