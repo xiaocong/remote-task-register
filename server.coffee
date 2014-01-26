@@ -25,8 +25,6 @@ app.use app.router # api router
 wss = {}
 app.all "#{app.get 'endpoint'}/:mac/*", (req, res) ->
   return res.send(404) if req.params.mac not of wss
-  # workaround here, I want to use
-  # req.pipe(stream) and then use stream in request
   stream = iostream.createStream()
   wss[req.params.mac].request
     path: "/api/#{req.params[0]}"
@@ -36,7 +34,9 @@ app.all "#{app.get 'endpoint'}/:mac/*", (req, res) ->
   , stream, (stream, options) ->
     res.statusCode = options.statusCode
     res.set(options.headers)
-    stream.pipe res
+    stream.on('error', (err) ->
+      res.end(err)
+    ).pipe res
   req.pipe stream
 
 ip = do ->

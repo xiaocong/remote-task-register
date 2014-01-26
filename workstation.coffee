@@ -25,7 +25,9 @@ ss.on 'http', (body, options) ->
       body: rawData
     req = request(opt)
     stream = iostream.createStream()
-    req.pipe stream
+    req.on('error', (err) ->
+      stream.end(err)
+    ).pipe stream
     req.on 'response', (response) ->
       ss.emit 'response', stream,
         statusCode: response.statusCode
