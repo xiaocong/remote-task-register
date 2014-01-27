@@ -35,7 +35,7 @@ app.all "#{app.get 'endpoint'}/:mac/*", (req, res) ->
     res.statusCode = options.statusCode
     res.set(options.headers)
     stream.on('error', (err) ->
-      res.end(err)
+      res.end()
     ).pipe res
   req.pipe stream
 
