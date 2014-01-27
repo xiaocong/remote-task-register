@@ -1,7 +1,6 @@
 "use strict"
 
 fs = require('fs')
-sh = require('execSync')
 io = require('socket.io-client')
 request = require('request')
 
@@ -53,34 +52,36 @@ update = ->
   getInfo (info) ->
     socket.emit 'update', info
 
-info = 
-  mac: fs.readFileSync('/sys/class/net/eth0/address').toString().trim()
-  uname: sh.exec('uname -n -m -o').stdout.trim()
-  api:
-    status: 'down'
-    jobs: []
-    devices:
-      android: []
+getInfo = do ->
+  info = 
+    mac: fs.readFileSync('/sys/class/net/eth0/address').toString().trim()
+    api:
+      status: 'down'
+      jobs: []
+      devices:
+        android: []
+  require('child_process').exec 'uname -n -m -o', (err, stdout, stderr) ->
+    info.uname = stdout.toString().trim()
 
-getInfo = (cb) ->
-  count = 3
-  callback = (count)->
-    cb info if count is 0
-  request "#{serverUrl}/api/ping", (err, response, body) ->
-    if err or response.statusCode isnt 200 or body isnt 'pong'
-      info.api.status = 'down'
-    else
-      info.api.status = 'up'
-    callback(--count)
-  request "#{serverUrl}/api/0/devices", (err, response, body) ->
-    if err or response.statusCode isnt 200
-      info.api.devices.android = []
-    else
-      info.api.devices = JSON.parse(body)
-    callback(--count)
-  request "#{serverUrl}/api/0/jobs", (err, response, body) ->
-    if err or response.statusCode isnt 200
-      info.api.jobs = []
-    else
-      info.api.jobs = JSON.parse(body).jobs
-    callback(--count)
+  (cb) ->
+    count = 3
+    callback = (count)->
+      cb info if count is 0
+    request "#{serverUrl}/api/ping", (err, response, body) ->
+      if err or response.statusCode isnt 200 or body isnt 'pong'
+        info.api.status = 'down'
+      else
+        info.api.status = 'up'
+      callback(--count)
+    request "#{serverUrl}/api/0/devices", (err, response, body) ->
+      if err or response.statusCode isnt 200
+        info.api.devices.android = []
+      else
+        info.api.devices = JSON.parse(body)
+      callback(--count)
+    request "#{serverUrl}/api/0/jobs", (err, response, body) ->
+      if err or response.statusCode isnt 200
+        info.api.jobs = []
+      else
+        info.api.jobs = JSON.parse(body).jobs
+      callback(--count)
