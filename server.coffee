@@ -6,7 +6,6 @@ _ = require('underscore')
 zookeeper = require('node-zookeeper-client')
 Backbone = require('backbone')
 iostream = require('socket.io-stream')
-zookeeper = require('node-zookeeper-client')
 
 app = express()
 server = require("http").createServer(app)
@@ -73,17 +72,19 @@ zk.once 'connected', ->
       ss = iostream(socket)
       request = http(ss)
       socket.on 'register', (msg, fn) ->
+        getApi = (msg) ->
+          status: msg.api?.status or 'down'
+          path: "#{app.get('endpoint')}/#{msg.mac}"
+          port: app.get('port')
+          jobs: msg.api?.jobs ? []
+          devices:
+            android: msg.api?.devices?.android ? []
         info = new Backbone.Model
           ip: ip,
           mac: msg.mac
           uname: msg.uname
-          api:
-            status: msg.api?.status or 'down'
-            path: "#{app.get('endpoint')}/#{msg.mac}"
-            port: app.get('port')
-            jobs: msg.api?.jobs ? []
-            devices:
-              android: msg.api?.devices?.android ? []
+          owner: msg.owner
+          api: getApi(msg)
         wss[msg.mac] =
           request: request
           info: info
@@ -101,13 +102,7 @@ zk.once 'connected', ->
             zk.remove path, (err) ->
 
           socket.on 'update', (msg, fn) ->  # update zk node
-            info.set 'api',
-              status: msg.api?.status or 'down'
-              path: "#{app.get('endpoint')}/#{msg.mac}"
-              port: app.get('port')
-              jobs: msg.api?.jobs ? []
-              devices:
-                android: msg.api?.devices?.android ? []
+            info.set 'api', getApi(msg)
             fn(returncode: 0) if fn
 
 server.listen app.get("port"), ->

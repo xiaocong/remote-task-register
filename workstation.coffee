@@ -40,8 +40,8 @@ socket.on 'connect', ->
         register callback
       , 10000
     else
-      timeoutId = setInterval update, 5000
-      socket.on 'disconnect', -> clearTimeout timeoutId
+      intervalId = setInterval update, 10000
+      socket.on 'disconnect', -> clearInterval intervalId
   register callback
 
 register = (cb) ->
